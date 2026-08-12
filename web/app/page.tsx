@@ -5,14 +5,30 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 
 import { auth } from "../lib/firebase";
 import { signInWithGoogle, signOutUser } from "../lib/auth";
+import { getUserProfile } from "../lib/users";
+import type { User as UserProfile } from "../types/user";
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+
+      if (!currentUser) {
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      const userProfile = await getUserProfile(currentUser.uid);
+
+      console.log("AUTH UID:", currentUser.uid);
+      console.log("FIRESTORE PROFILE:", userProfile);
+
+      setProfile(userProfile);
       setLoading(false);
     });
 
@@ -34,30 +50,7 @@ export default function Home() {
           Crystal Reports Cloud
         </div>
 
-        {user ? (
-          <>
-            <h1 className="max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl">
-              ¡Bienvenido, {user.displayName || "usuario"}!
-            </h1>
-
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-400">
-              Has iniciado sesión correctamente con Google.
-            </p>
-
-            <p className="mt-3 text-sm text-slate-500">
-              {user.email}
-            </p>
-
-            <div className="mt-10 flex gap-4">
-              <button
-                onClick={signOutUser}
-                className="rounded-xl border border-white/15 bg-white/5 px-6 py-3 font-medium text-white transition hover:bg-white/10"
-              >
-                Cerrar sesión
-              </button>
-            </div>
-          </>
-        ) : (
+        {!user ? (
           <>
             <h1 className="max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl">
               Controlá tus viáticos de forma simple.
@@ -68,37 +61,59 @@ export default function Home() {
               tus gastos diarios, semanales y mensuales.
             </p>
 
-            <div className="mt-10">
-              <button
-                onClick={() => signInWithGoogle()}
-                className="rounded-xl bg-white px-6 py-3 font-medium text-slate-950 transition hover:bg-slate-200"
-              >
-                Iniciar sesión con Google
-              </button>
+            <button
+              onClick={() => signInWithGoogle()}
+              className="mt-10 rounded-xl bg-white px-6 py-3 font-medium text-slate-950 transition hover:bg-slate-200"
+            >
+              Iniciar sesión con Google
+            </button>
+          </>
+        ) : profile ? (
+          <>
+            <h1 className="max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl">
+              ¡Bienvenido, {profile.name}!
+            </h1>
+
+            <p className="mt-6 text-lg text-slate-400">
+              Perfil encontrado correctamente en Firestore.
+            </p>
+
+            <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6 text-left">
+              <p>
+                <span className="text-slate-400">Correo:</span>{" "}
+                {profile.email}
+              </p>
+
+              <p className="mt-2">
+                <span className="text-slate-400">Rol:</span>{" "}
+                {profile.role}
+              </p>
             </div>
 
-            <div className="mt-16 grid w-full max-w-4xl gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-                <h2 className="font-medium">Viajes</h2>
-                <p className="mt-2 text-sm text-slate-400">
-                  Registrá cada viaje realizado.
-                </p>
-              </div>
+            <button
+              onClick={signOutUser}
+              className="mt-8 rounded-xl border border-white/15 bg-white/5 px-6 py-3 font-medium transition hover:bg-white/10"
+            >
+              Cerrar sesión
+            </button>
+          </>
+        ) : (
+          <>
+            <h1 className="text-4xl font-semibold">
+              Usuario no autorizado
+            </h1>
 
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-                <h2 className="font-medium">Facturas</h2>
-                <p className="mt-2 text-sm text-slate-400">
-                  Subí tus comprobantes y procesá sus montos.
-                </p>
-              </div>
+            <p className="mt-4 max-w-lg text-slate-400">
+              Tu cuenta de Google está autenticada, pero no tiene un perfil
+              registrado en Crystal Reports Cloud.
+            </p>
 
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-                <h2 className="font-medium">Viáticos</h2>
-                <p className="mt-2 text-sm text-slate-400">
-                  Conocé cuánto llevás gastado y cuánto te queda.
-                </p>
-              </div>
-            </div>
+            <button
+              onClick={signOutUser}
+              className="mt-8 rounded-xl border border-white/15 bg-white/5 px-6 py-3 font-medium transition hover:bg-white/10"
+            >
+              Cerrar sesión
+            </button>
           </>
         )}
       </section>
