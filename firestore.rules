@@ -3,7 +3,11 @@
     service cloud.firestore {
     match /databases/{database}/documents {
 
+        // ==========================================
+        // PERFIL DEL USUARIO
+        // ==========================================
         match /users/{userId} {
+
         allow read: if request.auth != null
             && request.auth.uid == userId;
 
@@ -14,6 +18,98 @@
         allow update: if request.auth != null
             && request.auth.uid == userId
             && request.resource.data.role == resource.data.role;
+
+        allow delete: if false;
+        }
+
+
+        // ==========================================
+        // VIAJES
+        // ==========================================
+        match /users/{userId}/travels/{travelId} {
+
+        allow read: if request.auth != null
+            && request.auth.uid == userId;
+
+        allow create: if request.auth != null
+            && request.auth.uid == userId
+            && request.resource.data.userId == userId;
+
+        allow update: if request.auth != null
+            && request.auth.uid == userId
+            && resource.data.userId == userId
+            && request.resource.data.userId == userId;
+
+        allow delete: if request.auth != null
+            && request.auth.uid == userId
+            && resource.data.userId == userId;
+        }
+
+
+        // ==========================================
+        // FACTURAS DENTRO DE VIAJES
+        // ==========================================
+        match /users/{userId}/travels/{travelId}/invoices/{invoiceId} {
+
+        allow read: if request.auth != null
+            && request.auth.uid == userId;
+
+        allow create: if request.auth != null
+            && request.auth.uid == userId
+            && request.resource.data.userId == userId
+            && request.resource.data.travelId == travelId;
+
+        allow update: if request.auth != null
+            && request.auth.uid == userId
+            && resource.data.userId == userId
+            && request.resource.data.userId == userId
+            && request.resource.data.travelId == travelId;
+
+        allow delete: if request.auth != null
+            && request.auth.uid == userId
+            && resource.data.userId == userId;
+        }
+
+
+        // ==========================================
+        // FACTURAS INDEPENDIENTES
+        // ==========================================
+        match /users/{userId}/invoices/{invoiceId} {
+
+        allow read: if request.auth != null
+            && request.auth.uid == userId;
+
+        allow create: if request.auth != null
+            && request.auth.uid == userId
+            && request.resource.data.userId == userId;
+
+        allow update: if request.auth != null
+            && request.auth.uid == userId
+            && resource.data.userId == userId
+            && request.resource.data.userId == userId;
+
+        // El usuario puede eliminar únicamente sus propias facturas
+        allow delete: if request.auth != null
+            && request.auth.uid == userId
+            && resource.data.userId == userId;
+        }
+                // ==========================================
+        // EXPEDIENTES / REPORTES GENERADOS
+        // ==========================================
+        match /users/{userId}/reports/{reportId} {
+
+        // El usuario puede consultar únicamente
+        // sus propios expedientes.
+        allow read: if request.auth != null
+            && request.auth.uid == userId;
+
+        // La creación de expedientes la realiza
+        // la Cloud Function con Admin SDK.
+        allow create: if false;
+
+        // El usuario no modifica expedientes
+        // generados por el sistema.
+        allow update: if false;
 
         allow delete: if false;
         }
