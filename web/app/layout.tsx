@@ -1,6 +1,8 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type {Metadata} from "next";
+import {Geist, Geist_Mono} from "next/font/google";
 import "./globals.css";
+
+import PwaRegister from "../components/PwaRegister";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,7 +16,9 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Crystal Reports Cloud",
-  description: "Gestión inteligente de viáticos y gastos de viaje.",
+  description:
+    "Gestión inteligente de viáticos y gastos de viaje.",
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({
@@ -27,7 +31,10 @@ export default function RootLayout({
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body>{children}</body>
+      <body>
+        <PwaRegister />
+        {children}
+      </body>
     </html>
   );
 }

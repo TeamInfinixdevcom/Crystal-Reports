@@ -1,0 +1,39 @@
+{
+  "name": "Crystal Reports Cloud",
+  "short_name": "Crystal Reports",
+  "description": "Gestión inteligente de viáticos y gastos de viaje.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf9f7",
+  "theme_color": "#faf9f7",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "share_target": {
+    "action": "/compartir",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "file",
+          "accept": [
+            "application/pdf",
+            "image/jpeg",
+            "image/png"
+          ]
+        }
+      ]
+    }
+  }
+}
