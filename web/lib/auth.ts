@@ -2,32 +2,16 @@ import {
   GoogleAuthProvider,
   getRedirectResult,
   signInWithPopup,
-  signInWithRedirect,
   signOut,
 } from "firebase/auth";
-import {FirebaseError} from "firebase/app";
+import { FirebaseError } from "firebase/app";
 
-import {auth} from "./firebase";
+import { auth } from "./firebase";
 
 const googleProvider = new GoogleAuthProvider();
 
 export async function signInWithGoogle() {
   try {
-    const isMobile =
-      typeof window !== "undefined" &&
-      /Android|iPhone|iPad|iPod/i.test(
-        navigator.userAgent,
-      );
-
-    if (isMobile) {
-      await signInWithRedirect(
-        auth,
-        googleProvider,
-      );
-
-      return null;
-    }
-
     const result = await signInWithPopup(
       auth,
       googleProvider,
@@ -41,6 +25,8 @@ export async function signInWithGoogle() {
     ) {
       return null;
     }
+
+    console.error("ERROR GOOGLE LOGIN:", error);
 
     throw error;
   }
