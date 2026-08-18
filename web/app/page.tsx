@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 
 import { auth } from "../lib/firebase";
-import { signInWithGoogle, signOutUser } from "../lib/auth";
+import {
+  getGoogleRedirectResult,
+  signInWithGoogle,
+  signOutUser,
+} from "../lib/auth";
 import { getUserProfile } from "../lib/users";
 import type { User as UserProfile } from "../types/user";
 
@@ -22,22 +26,61 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
+    let mounted = true;
 
-      if (!currentUser) {
-        setProfile(null);
-        setLoading(false);
-        return;
+    const handleRedirectResult = async () => {
+      try {
+        await getGoogleRedirectResult();
+      } catch (error) {
+        console.error(
+          "ERROR PROCESANDO LOGIN GOOGLE:",
+          error,
+        );
       }
+    };
 
-      const userProfile = await getUserProfile(currentUser.uid);
+    handleRedirectResult();
 
-      setProfile(userProfile);
-      setLoading(false);
-    });
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      async (currentUser) => {
+        if (!mounted) return;
 
-    return unsubscribe;
+        setUser(currentUser);
+
+        if (!currentUser) {
+          setProfile(null);
+          setLoading(false);
+          return;
+        }
+
+        try {
+          const userProfile = await getUserProfile(
+            currentUser.uid,
+          );
+
+          if (!mounted) return;
+
+          setProfile(userProfile);
+          setLoading(false);
+        } catch (error) {
+          console.error(
+            "ERROR CARGANDO PERFIL:",
+            error,
+          );
+
+          if (!mounted) return;
+
+          setProfile(null);
+          setLoading(false);
+        }
+      },
+    );
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
   }, []);
 
   if (loading) {
