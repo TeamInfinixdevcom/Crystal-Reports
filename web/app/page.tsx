@@ -134,10 +134,6 @@ export default function Home() {
     };
   }, []);
 
-  /*
-   * Mientras Firebase Auth todavía está determinando
-   * si existe una sesión, mostramos solamente Cargando.
-   */
   if (loadingAuth) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#faf9f7] text-[#1d1d1f]">
@@ -148,9 +144,6 @@ export default function Home() {
     );
   }
 
-  /*
-   * Usuario no autenticado.
-   */
   if (!user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#faf9f7] px-6">
@@ -204,13 +197,6 @@ export default function Home() {
     );
   }
 
-  /*
-   * Firebase Auth ya confirmó al usuario,
-   * pero todavía estamos consultando su perfil.
-   *
-   * IMPORTANTE:
-   * Aquí ya NO mostramos "Usuario no autorizado".
-   */
   if (loadingProfile) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#faf9f7] text-[#1d1d1f]">
@@ -221,11 +207,6 @@ export default function Home() {
     );
   }
 
-  /*
-   * Ya terminó la consulta de Firestore.
-   * Si no existe perfil, ahora sí mostramos
-   * que el usuario no está autorizado.
-   */
   if (!profile) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#faf9f7] px-6">
@@ -273,13 +254,6 @@ export default function Home() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f6f1e9] text-lg">
             ◇
           </div>
-
-          <button
-            onClick={signOutUser}
-            className="rounded-xl border border-[#e4e0d9] bg-white px-4 py-2 text-sm transition active:scale-95"
-          >
-            Salir
-          </button>
         </header>
 
         {/* Contenido principal */}
