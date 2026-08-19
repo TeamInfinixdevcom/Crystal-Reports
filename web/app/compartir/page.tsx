@@ -111,6 +111,9 @@ async function deleteSharedFile(
 
 export default function CompartirPage() {
   const [file, setFile] = useState<File | null>(null);
+  const [fileUrl, setFileUrl] = useState<string | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(
     null,
@@ -124,6 +127,7 @@ export default function CompartirPage() {
     ) => {
       try {
         setLoading(true);
+        setError(null);
 
         const sharedFile =
           await getSharedFile(fileId);
@@ -187,23 +191,38 @@ export default function CompartirPage() {
 
     const fileId = params.get("fileId");
 
-    if (fileId) {
-      loadSharedFile(fileId);
-    } else {
-      setLoading(false);
-    }
+      if (fileId) {
+        loadSharedFile(fileId);
+      } else {
+        setLoading(false);
+      }
+
+      return () => {
+        mounted = false;
+
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.removeEventListener(
+            "message",
+            handleMessage,
+          );
+        }
+      };
+    }, []);
+
+    useEffect(() => {
+      if (!file) {
+        setFileUrl(null);
+        return;
+      }
+
+    const url = URL.createObjectURL(file);
+
+    setFileUrl(url);
 
     return () => {
-      mounted = false;
-
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.removeEventListener(
-          "message",
-          handleMessage,
-        );
-      }
+      URL.revokeObjectURL(url);
     };
-  }, []);
+  }, [file]);
 
   return (
     <main className="min-h-screen bg-[#faf9f7] text-[#1d1d1f]">
@@ -292,21 +311,29 @@ export default function CompartirPage() {
                 </div>
               </div>
 
-              <div className="mt-6 overflow-hidden rounded-[20px] border border-[#eeeae4] bg-[#f5f3ef]">
-                {file.type === "application/pdf" ? (
-                  <iframe
-                    title="Vista previa de factura"
-                    src={URL.createObjectURL(file)}
-                    className="h-[600px] w-full"
-                  />
-                ) : (
-                  <div className="flex min-h-[400px] items-center justify-center p-6">
-                    <img
-                      src={URL.createObjectURL(file)}
-                      alt={file.name}
-                      className="max-h-[600px] max-w-full rounded-xl object-contain"
-                    />
-                  </div>
+              <div className="mt-8 rounded-[24px] border border-[#eeeae4] bg-[#faf9f7] p-8 text-center">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-white text-4xl shadow-sm">
+                  📄
+                </div>
+
+                <h2 className="mt-6 text-xl font-semibold">
+                  Factura recibida
+                </h2>
+
+                <p className="mt-2 text-sm leading-6 text-[#77736c]">
+                  El documento llegó correctamente a
+                  Crystal Reports.
+                </p>
+
+                {fileUrl && (
+                  <a
+                    href={fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-7 inline-flex w-full items-center justify-center rounded-2xl bg-[#1d1d1f] px-6 py-4 font-medium text-white transition-all duration-150 hover:bg-[#333] active:scale-[0.98]"
+                  >
+                    Abrir factura
+                  </a>
                 )}
               </div>
 
@@ -322,8 +349,9 @@ export default function CompartirPage() {
                     </p>
 
                     <p className="mt-1 text-sm leading-6 text-[#77736c]">
-                      La factura fue recibida correctamente
-                      desde el menú de compartir.
+                      La factura fue recibida desde el
+                      menú de compartir y está lista para
+                      continuar con el procesamiento.
                     </p>
                   </div>
                 </div>
