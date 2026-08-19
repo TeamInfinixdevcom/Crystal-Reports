@@ -1,7 +1,12 @@
 "use client";
 
 import {useEffect, useState} from "react";
-import {doc, serverTimestamp, updateDoc} from "firebase/firestore";
+import {useRouter} from "next/navigation";
+import {
+  doc,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
 
 import {auth, db} from "../../lib/firebase";
 import {
@@ -117,6 +122,8 @@ async function deleteSharedFile(
 }
 
 export default function CompartirPage() {
+  const router = useRouter();
+
   const [file, setFile] = useState<File | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(
     null,
@@ -314,7 +321,7 @@ export default function CompartirPage() {
         },
       );
 
-      setConfirming(false);
+      router.push("/");
     } catch (error) {
       console.error(
         "ERROR CONFIRMANDO FACTURA:",
