@@ -23,7 +23,9 @@ import MobileNav from "../components/navigation/MobileNav";
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  const [loadingAuth, setLoadingAuth] = useState(true);
+  const [loadingProfile, setLoadingProfile] = useState(false);
 
   const [redirectStatus, setRedirectStatus] = useState(
     "Esperando resultado de Google...",
@@ -91,12 +93,15 @@ export default function Home() {
         }
 
         setUser(currentUser);
+        setLoadingAuth(false);
 
         if (!currentUser) {
           setProfile(null);
-          setLoading(false);
+          setLoadingProfile(false);
           return;
         }
+
+        setLoadingProfile(true);
 
         try {
           const userProfile = await getUserProfile(
@@ -106,7 +111,6 @@ export default function Home() {
           if (!mounted) return;
 
           setProfile(userProfile);
-          setLoading(false);
         } catch (error) {
           console.error(
             "ERROR CARGANDO PERFIL:",
@@ -116,7 +120,10 @@ export default function Home() {
           if (!mounted) return;
 
           setProfile(null);
-          setLoading(false);
+        } finally {
+          if (mounted) {
+            setLoadingProfile(false);
+          }
         }
       },
     );
@@ -127,7 +134,11 @@ export default function Home() {
     };
   }, []);
 
-  if (loading) {
+  /*
+   * Mientras Firebase Auth todavía está determinando
+   * si existe una sesión, mostramos solamente Cargando.
+   */
+  if (loadingAuth) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#faf9f7] text-[#1d1d1f]">
         <p className="text-sm text-[#8a857c]">
@@ -137,6 +148,9 @@ export default function Home() {
     );
   }
 
+  /*
+   * Usuario no autenticado.
+   */
   if (!user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#faf9f7] px-6">
@@ -190,6 +204,28 @@ export default function Home() {
     );
   }
 
+  /*
+   * Firebase Auth ya confirmó al usuario,
+   * pero todavía estamos consultando su perfil.
+   *
+   * IMPORTANTE:
+   * Aquí ya NO mostramos "Usuario no autorizado".
+   */
+  if (loadingProfile) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#faf9f7] text-[#1d1d1f]">
+        <p className="text-sm text-[#8a857c]">
+          Cargando tu perfil...
+        </p>
+      </main>
+    );
+  }
+
+  /*
+   * Ya terminó la consulta de Firestore.
+   * Si no existe perfil, ahora sí mostramos
+   * que el usuario no está autorizado.
+   */
   if (!profile) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#faf9f7] px-6">
