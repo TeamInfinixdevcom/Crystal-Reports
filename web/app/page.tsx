@@ -27,47 +27,13 @@ export default function Home() {
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [loadingProfile, setLoadingProfile] = useState(false);
 
-  const [redirectStatus, setRedirectStatus] = useState(
-    "Esperando resultado de Google...",
-  );
-  const [redirectError, setRedirectError] = useState<string | null>(
-    null,
-  );
-  const [authStatus, setAuthStatus] = useState(
-    "Esperando estado de Firebase Auth...",
-  );
-
   useEffect(() => {
     let mounted = true;
 
     const handleRedirectResult = async () => {
       try {
-        setRedirectStatus("Procesando retorno de Google...");
-
-        const redirectUser = await getGoogleRedirectResult();
-
-        if (!mounted) return;
-
-        if (redirectUser) {
-          setRedirectStatus(
-            `Google devolvió usuario: ${redirectUser.email ?? "sin email"}`,
-          );
-        } else {
-          setRedirectStatus(
-            "Google no devolvió usuario mediante getRedirectResult().",
-          );
-        }
+        await getGoogleRedirectResult();
       } catch (error: unknown) {
-        if (!mounted) return;
-
-        const message =
-          error instanceof Error
-            ? error.message
-            : String(error);
-
-        setRedirectStatus("ERROR en getRedirectResult()");
-        setRedirectError(message);
-
         console.error(
           "ERROR PROCESANDO LOGIN GOOGLE:",
           error,
@@ -81,16 +47,6 @@ export default function Home() {
       auth,
       async (currentUser) => {
         if (!mounted) return;
-
-        if (currentUser) {
-          setAuthStatus(
-            `Firebase Auth tiene usuario: ${currentUser.email ?? "sin email"}`,
-          );
-        } else {
-          setAuthStatus(
-            "Firebase Auth: currentUser es NULL",
-          );
-        }
 
         setUser(currentUser);
         setLoadingAuth(false);
@@ -166,32 +122,6 @@ export default function Home() {
           >
             Iniciar sesión con Google
           </button>
-
-          {/* Diagnóstico temporal */}
-          <div className="mt-8 rounded-2xl border border-[#e4e0d9] bg-white p-5 text-left text-xs text-[#55514a]">
-            <p className="mb-3 font-semibold text-[#1d1d1f]">
-              Diagnóstico temporal
-            </p>
-
-            <div className="space-y-2">
-              <p>
-                <strong>Redirect:</strong>{" "}
-                {redirectStatus}
-              </p>
-
-              <p>
-                <strong>Firebase Auth:</strong>{" "}
-                {authStatus}
-              </p>
-
-              {redirectError && (
-                <p className="break-words text-red-600">
-                  <strong>Error:</strong>{" "}
-                  {redirectError}
-                </p>
-              )}
-            </div>
-          </div>
         </section>
       </main>
     );
