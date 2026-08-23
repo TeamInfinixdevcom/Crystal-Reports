@@ -2,6 +2,7 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
 import { defineSecret } from "firebase-functions/params";
 import * as crypto from "crypto";
+import * as nodemailer from "nodemailer";
 
 
 admin.initializeApp();
@@ -11,6 +12,58 @@ const GEMINI_API_KEY =
 
 const EMAIL_INGEST_SECRET =
   defineSecret("EMAIL_INGEST_SECRET");
+
+const SMTP_APP_PASSWORD =
+  defineSecret("SMTP_APP_PASSWORD");
+const sendUnregisteredEmail = async (
+  recipientEmail: string,
+): Promise<void> => {
+  const transporter =
+    nodemailer.createTransport({
+      service: "gmail",
+
+      auth: {
+        user:
+          "crystalreports.facturas@gmail.com",
+
+        pass:
+          SMTP_APP_PASSWORD.value(),
+      },
+    });
+
+  await transporter.sendMail({
+    from:
+      "Crystal Reports <crystalreports.facturas@gmail.com>",
+
+    to:
+      recipientEmail,
+
+    subject:
+      "Factura no procesada – Crystal Reports",
+
+    text: `
+Hola,
+
+Recibimos tu factura, pero no fue procesada porque la dirección de correo desde la que la enviaste no coincide con la dirección de correo con la que creaste tu cuenta de Crystal Reports.
+
+Importante: para conservar correctamente tus facturas, viajes e historial, debés utilizar siempre la misma cuenta y dirección de correo con la que te registraste en Crystal Reports.
+
+No es necesario crear una nueva cuenta.
+
+Correo desde el que se recibió la factura:
+${recipientEmail}
+
+Si ya tenés una cuenta de Crystal Reports creada con otra dirección, ingresá utilizando esa cuenta y reenviá la factura desde el correo asociado a ella.
+
+La factura no fue almacenada ni asignada a ninguna cuenta.
+
+Saludos,
+
+Crystal Reports
+Sistema de gestión de gastos
+`,
+  });
+};
 
 /**
  * ==========================================
@@ -1388,6 +1441,7 @@ export const receiveInvoiceEmail =
       secrets: [
         EMAIL_INGEST_SECRET,
         GEMINI_API_KEY,
+        SMTP_APP_PASSWORD,
       ],
       maxInstances: 3,
       timeoutSeconds: 120,
@@ -1491,14 +1545,27 @@ export const receiveInvoiceEmail =
               )
               .limit(1)
               .get();
-
           if (
             usersSnapshot.empty
           ) {
-            res.status(404).json({
+            try {
+              await sendUnregisteredEmail(
+                senderEmail,
+              );
+            } catch (
+              emailError
+            ) {
+              console.error(
+                "ERROR ENVIANDO AVISO DE CORREO NO REGISTRADO:",
+                emailError,
+              );
+            }
+
+            res.status(200).json({
               success: false,
-              error:
-                "No existe un usuario registrado con ese correo.",
+              registered: false,
+              message:
+                "El correo remitente no está registrado en Crystal Reports.",
             });
 
             return;
