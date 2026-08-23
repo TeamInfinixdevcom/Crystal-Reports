@@ -3,6 +3,7 @@ import {Geist, Geist_Mono} from "next/font/google";
 import "./globals.css";
 
 import PwaRegister from "../components/PwaRegister";
+import PageTransition from "../components/navigation/PageTransition";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,7 +34,10 @@ export default function RootLayout({
     >
       <body>
         <PwaRegister />
-        {children}
+
+        <PageTransition>
+          {children}
+        </PageTransition>
       </body>
     </html>
   );

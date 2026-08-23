@@ -40,7 +40,17 @@ export default function MobileNav({
   ] as const;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#eeeae4] bg-white/95 px-3 pb-4 pt-3 backdrop-blur-md lg:hidden">
+    <nav
+      className="
+        fixed bottom-0 left-0 right-0 z-50 lg:hidden
+        border-t border-white/70
+        bg-white/75
+        px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]
+        backdrop-blur-2xl
+        supports-[backdrop-filter]:bg-white/60
+        shadow-[0_-8px_30px_rgba(0,0,0,0.05)]
+      "
+    >
       <div className="mx-auto flex max-w-md items-center justify-around">
         {items.map((item) => {
           const isActive =
@@ -50,20 +60,63 @@ export default function MobileNav({
             <button
               key={item.id}
               onClick={() => router.push(item.path)}
-              className={`flex min-w-[70px] flex-col items-center gap-1 rounded-xl px-3 py-2 transition-all duration-150 active:scale-90 ${
-                isActive
-                  ? "bg-[#f6f1e9] text-[#8f7957]"
-                  : "text-[#77736c] hover:bg-[#f6f3ee]"
-              }`}
+              className="
+                relative
+                flex min-w-[70px]
+                flex-col items-center
+                gap-1
+                rounded-2xl
+                px-3 py-2
+                transition-all
+                duration-300
+                ease-[cubic-bezier(0.22,1,0.36,1)]
+                active:scale-[0.94]
+              "
             >
-              <span className="text-lg">
+              {/* Superficie activa */}
+              <span
+                aria-hidden="true"
+                className={`
+                  absolute inset-0 -z-10 rounded-2xl
+                  transition-all
+                  duration-300
+                  ease-[cubic-bezier(0.22,1,0.36,1)]
+                  ${
+                    isActive
+                      ? "scale-100 bg-[#f6f1e9] opacity-100 shadow-[0_4px_14px_rgba(161,141,109,0.10)]"
+                      : "scale-90 bg-transparent opacity-0"
+                  }
+                `}
+              />
+
+              <span
+                className={`
+                  text-lg
+                  transition-transform
+                  duration-300
+                  ease-[cubic-bezier(0.22,1,0.36,1)]
+                  ${
+                    isActive
+                      ? "scale-105"
+                      : "scale-100"
+                  }
+                `}
+              >
                 {item.icon}
               </span>
 
               <span
-                className={`text-[11px] ${
-                  isActive ? "font-medium" : ""
-                }`}
+                className={`
+                  text-[11px]
+                  transition-all
+                  duration-300
+                  ease-[cubic-bezier(0.22,1,0.36,1)]
+                  ${
+                    isActive
+                      ? "font-medium text-[#8f7957]"
+                      : "text-[#77736c]"
+                  }
+                `}
               >
                 {item.label}
               </span>
