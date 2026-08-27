@@ -478,7 +478,7 @@ export default function TravelPage({
       setError(null);
       setConfirmingInvoiceId(invoiceId);
 
-      const invoiceRef = doc(
+      const travelInvoiceRef = doc(
         db,
         "users",
         user.uid,
@@ -488,9 +488,24 @@ export default function TravelPage({
         invoiceId,
       );
 
+      await updateDoc(travelInvoiceRef, {
+        status: "confirmed",
+        confirmedAt: serverTimestamp(),
+      });
+
+      const invoiceRef = doc(
+        db,
+        "users",
+        user.uid,
+        "invoices",
+        invoiceId,
+      );
+
       await updateDoc(invoiceRef, {
         status: "confirmed",
         confirmedAt: serverTimestamp(),
+        travelId,
+        updatedAt: serverTimestamp(),
       });
 
       setInvoices((currentInvoices) =>
