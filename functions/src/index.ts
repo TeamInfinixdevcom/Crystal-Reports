@@ -950,30 +950,37 @@ export const generateMonthlyReport =
          */
 
         type MonthlyInvoice = {
-          id: string;
+  id: string;
 
-          tripDate?:
-            string | null;
+  tripDate?:
+    string | null;
 
-          invoiceDate?:
-            string | null;
+  invoiceDate?:
+    string | null;
 
-          uploadedAt?:
-            admin.firestore.Timestamp |
-            null;
+  uploadedAt?:
+    admin.firestore.Timestamp |
+    null;
 
-          storagePath?:
-            string | null;
+  storagePath?:
+    string | null;
 
-          fileType?:
-            string | null;
+  fileType?:
+    string | null;
 
-          amount?:
-            number | null;
+  amount?:
+    number | null;
 
-          status?:
-            string | null;
-        };
+  status?:
+    string | null;
+
+  processingError?:
+    string | null;
+
+  processedAt?:
+    admin.firestore.Timestamp |
+    null;
+};
 
 
         /*
@@ -1018,43 +1025,46 @@ export const generateMonthlyReport =
          * AGOSTO 2026
          */
 
-        const filteredInvoices =
-          invoices
-            .filter(
-              (invoice) => {
+      const filteredInvoices =
+  invoices
+    .filter(
+      (invoice) => {
+        if (!invoice.uploadedAt) {
+          return false;
+        }
 
-                if (
-                  !invoice.uploadedAt
-                ) {
-                  return false;
-                }
+        const uploadedDate =
+          invoice.uploadedAt.toDate();
 
-                const uploadedDate =
-                  invoice.uploadedAt.toDate();
-
-                return (
-                  uploadedDate.getFullYear() ===
-                    year &&
-                  uploadedDate.getMonth() + 1 ===
-                    month
-                );
-              },
-            )
-            .filter(
-              (invoice) =>
-                typeof invoice.storagePath ===
-                  "string" &&
-                invoice.storagePath.length >
-                  0,
-            )
-            .filter(
-              (invoice) =>
-                invoice.status ===
-                  "confirmed" ||
-                invoice.status ===
-                  "processed",
-            );
-
+        return (
+          uploadedDate.getFullYear() ===
+            year &&
+          uploadedDate.getMonth() + 1 ===
+            month
+        );
+      },
+    )
+    .filter(
+      (invoice) =>
+        typeof invoice.storagePath ===
+          "string" &&
+        invoice.storagePath.length >
+          0,
+    )
+    .filter(
+      (invoice) =>
+        invoice.status ===
+          "confirmed" ||
+        invoice.status ===
+          "processed" ||
+        (
+          invoice.status ===
+            "review" &&
+          invoice.processingError ===
+            null &&
+          invoice.processedAt
+        ),
+    );
 
         /*
          * ==========================================
