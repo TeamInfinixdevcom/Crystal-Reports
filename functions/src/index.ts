@@ -1025,7 +1025,7 @@ export const generateMonthlyReport =
          * AGOSTO 2026
          */
 
-      const filteredInvoices =
+        const filteredInvoices =
   invoices
     .filter(
       (invoice) => {
@@ -1037,31 +1037,23 @@ export const generateMonthlyReport =
           invoice.uploadedAt.toDate();
 
         return (
-          uploadedDate.getFullYear() ===
-            year &&
-          uploadedDate.getMonth() + 1 ===
-            month
+          uploadedDate.getFullYear() === year &&
+          uploadedDate.getMonth() + 1 === month
         );
       },
     )
     .filter(
       (invoice) =>
-        typeof invoice.storagePath ===
-          "string" &&
-        invoice.storagePath.length >
-          0,
+        typeof invoice.storagePath === "string" &&
+        invoice.storagePath.length > 0,
     )
     .filter(
       (invoice) =>
-        invoice.status ===
-          "confirmed" ||
-        invoice.status ===
-          "processed" ||
+        invoice.status === "confirmed" ||
+        invoice.status === "processed" ||
         (
-          invoice.status ===
-            "review" &&
-          invoice.processingError ===
-            null &&
+          invoice.status === "review" &&
+          invoice.processingError === null &&
           invoice.processedAt
         ),
     );
