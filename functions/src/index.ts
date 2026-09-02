@@ -1419,6 +1419,730 @@ export const generateMonthlyReport =
 
       
     );
+
+/**
+ * ==========================================
+ * OBTENER URL TEMPORAL DEL REPORTE
+ * ==========================================
+ */
+
+export const getReportUrl =
+  functions
+    .https.onCall(
+      async (
+        data,
+        context,
+      ) => {
+
+        /*
+         * ==========================================
+         * 1. AUTENTICACIÓN
+         * ==========================================
+         */
+
+        if (!context.auth) {
+          throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Debés iniciar sesión.",
+          );
+        }
+
+        const userId =
+          context.auth.uid;
+
+
+        /*
+         * ==========================================
+         * 2. VALIDAR PARÁMETRO
+         * ==========================================
+         */
+
+        const storagePath =
+          data?.storagePath;
+
+        if (
+          typeof storagePath !==
+          "string" ||
+          storagePath.length === 0
+        ) {
+          throw new functions.https.HttpsError(
+            "invalid-argument",
+            "storagePath es obligatorio.",
+          );
+        }
+
+        /*
+         * ==========================================
+         * 3. VALIDAR PROPIEDAD
+         * ==========================================
+         *
+         * El storagePath debe empezar con:
+         * users/{userId}/reports/
+         */
+
+        const expectedPrefix =
+          `users/${userId}/reports/`;
+
+        if (
+          !storagePath.startsWith(
+            expectedPrefix,
+          )
+        ) {
+          throw new functions.https.HttpsError(
+            "permission-denied",
+            "No tenés permiso para acceder a este reporte.",
+          );
+        }
+
+
+        /*
+         * ==========================================
+         * 4. GENERAR URL TEMPORAL
+         * ==========================================
+         */
+
+        try {
+          const bucket =
+            admin
+              .storage()
+              .bucket();
+
+          const file =
+            bucket.file(storagePath);
+
+          const [
+            url,
+          ] =
+            await file.getSignedUrl(
+              {
+                action:
+                  "read",
+
+                expires:
+                  Date.now() +
+                  1000 *
+                    60 *
+                    60,
+              },
+            );
+
+          return {
+            success: true,
+            url,
+          };
+        } catch (error) {
+          console.error(
+            "ERROR GENERANDO URL TEMPORAL:",
+            error,
+          );
+
+          throw new functions.https.HttpsError(
+            "internal",
+            "No fue posible obtener la URL del reporte.",
+          );
+        }
+      },
+    );
+
+
+/**
+ * ==========================================
+ * GENERAR EXPEDIENTE POR RANGO DE FECHAS
+ * ==========================================
+ *
+ * Genera un expediente uniendo PDFs de facturas
+ * cuyas fechas de viaje (tripDate) estén
+ * dentro del rango seleccionado.
+ *
+ * Parámetros:
+ * - startDate: YYYY-MM-DD (incluida)
+ * - endDate: YYYY-MM-DD (incluida)
+ *
+ * Cada generación crea un expediente independiente.
+ */
+
+export const generateRangeReport =
+  functions
+    .runWith({
+      maxInstances: 3,
+
+      timeoutSeconds: 120,
+
+      memory: "512MB",
+    })
+    .https.onCall(
+      async (
+        data,
+        context,
+      ) => {
+
+        /*
+         * ==========================================
+         * 1. AUTENTICACIÓN
+         * ==========================================
+         */
+
+        if (!context.auth) {
+          throw new functions.https.HttpsError(
+            "unauthenticated",
+            "Debés iniciar sesión.",
+          );
+        }
+
+        const userId =
+          context.auth.uid;
+
+
+        /*
+         * ==========================================
+         * 2. VALIDAR FECHAS
+         * ==========================================
+         */
+
+        const startDate =
+          data?.startDate;
+
+        const endDate =
+          data?.endDate;
+
+        if (
+          typeof startDate !==
+            "string" ||
+          typeof endDate !==
+            "string"
+        ) {
+          throw new functions.https.HttpsError(
+            "invalid-argument",
+            "startDate y endDate son obligatorios.",
+          );
+        }
+
+        /*
+         * Validar formato YYYY-MM-DD
+         */
+
+        const dateRegex =
+          /^\d{4}-\d{2}-\d{2}$/;
+
+        if (
+          !dateRegex.test(startDate) ||
+          !dateRegex.test(endDate)
+        ) {
+          throw new functions.https.HttpsError(
+            "invalid-argument",
+            "Las fechas deben estar en formato YYYY-MM-DD.",
+          );
+        }
+
+        /*
+         * Validar que startDate <= endDate
+         */
+
+        if (startDate > endDate) {
+          throw new functions.https.HttpsError(
+            "invalid-argument",
+            "La fecha inicial no puede ser posterior a la fecha final.",
+          );
+        }
+
+
+        /*
+         * ==========================================
+         * 3. FIRESTORE
+         * ==========================================
+         */
+
+        const db =
+          admin.firestore();
+
+
+        /*
+         * ==========================================
+         * 4. OBTENER FACTURAS
+         * ==========================================
+         */
+
+        const invoicesSnapshot =
+          await db
+            .collection("users")
+            .doc(userId)
+            .collection("invoices")
+            .get();
+
+
+        /*
+         * ==========================================
+         * 5. TIPO DE FACTURA
+         * ==========================================
+         */
+
+        type RangeInvoice = {
+          id: string;
+
+          tripDate?:
+            string | null;
+
+          invoiceDate?:
+            string | null;
+
+          storagePath?:
+            string | null;
+
+          fileType?:
+            string | null;
+
+          amount?:
+            number | null;
+
+          status?:
+            string | null;
+
+          processingError?:
+            string | null;
+
+          processedAt?:
+            admin.firestore.Timestamp |
+            null;
+        };
+
+
+        /*
+         * ==========================================
+         * 6. CONVERTIR DOCUMENTOS
+         * ==========================================
+         */
+
+        const invoices:
+          RangeInvoice[] =
+          invoicesSnapshot.docs.map(
+            (invoiceDoc) => ({
+              id:
+                invoiceDoc.id,
+
+              ...(
+                invoiceDoc.data() as Omit<
+                  RangeInvoice,
+                  "id"
+                >
+              ),
+            }),
+          );
+
+
+        /*
+         * ==========================================
+         * 7. FILTRAR FACTURAS POR RANGO
+         * ==========================================
+         *
+         * El rango se determina por tripDate.
+         *
+         * Se incluyen ambas fechas
+         * (startDate y endDate).
+         *
+         * Ejemplo:
+         *
+         * Viaje: 31/07/2026
+         * Factura subida: 02/09/2026
+         * Período: 31/08/2026 → 25/09/2026
+         *
+         * El viaje del 31/07 NO se incluye
+         * (antes del 31/08).
+         *
+         * Un viaje del 01/09 SÍ se incluye
+         * (dentro del rango).
+         */
+
+        const filteredInvoices =
+          invoices
+            .filter(
+              (invoice) => {
+                if (!invoice.tripDate) {
+                  return false;
+                }
+
+                return (
+                  invoice.tripDate >=
+                    startDate &&
+                  invoice.tripDate <=
+                    endDate
+                );
+              },
+            )
+            .filter(
+              (invoice) =>
+                typeof invoice.storagePath ===
+                  "string" &&
+                invoice.storagePath.length >
+                  0,
+            )
+            .filter(
+              (invoice) =>
+                invoice.status ===
+                  "confirmed" ||
+                invoice.status ===
+                  "processed" ||
+                (
+                  invoice.status ===
+                    "review" &&
+                  invoice.processingError ===
+                    null &&
+                  invoice.processedAt
+                ),
+            );
+
+        /*
+         * ==========================================
+         * 8. VALIDAR VIAJES ENCONTRADOS
+         * ==========================================
+         */
+
+        if (
+          filteredInvoices.length ===
+          0
+        ) {
+          throw new functions.https.HttpsError(
+            "not-found",
+            "No existen viajes dentro del rango seleccionado.",
+          );
+        }
+
+
+        /*
+         * ==========================================
+         * 9. ORDENAR FACTURAS
+         * ==========================================
+         *
+         * tripDate / invoiceDate
+         * definen el orden dentro
+         * del expediente.
+         */
+
+        filteredInvoices.sort(
+          (a, b) => {
+
+            const dateA =
+              a.tripDate ??
+              a.invoiceDate ??
+              "";
+
+            const dateB =
+              b.tripDate ??
+              b.invoiceDate ??
+              "";
+
+            return dateA.localeCompare(
+              dateB,
+            );
+          },
+        );
+
+
+        /*
+         * ==========================================
+         * 10. CREAR PDF
+         * ==========================================
+         */
+
+        const {
+          PDFDocument,
+        } =
+          await import(
+            "pdf-lib"
+          );
+
+        const mergedPdf =
+          await PDFDocument.create();
+
+        const bucket =
+          admin
+            .storage()
+            .bucket();
+
+        let pdfCount = 0;
+
+
+        /*
+         * ==========================================
+         * 11. UNIR PDFs
+         * ==========================================
+         */
+
+        for (
+          const invoice of
+          filteredInvoices
+        ) {
+
+          const storagePath =
+            invoice.storagePath;
+
+          if (
+            typeof storagePath !==
+            "string"
+          ) {
+            continue;
+          }
+
+          if (
+            invoice.fileType !==
+            "application/pdf"
+          ) {
+            continue;
+          }
+
+          const file =
+            bucket.file(
+              storagePath,
+            );
+
+          const [
+            buffer,
+          ] =
+            await file.download();
+
+          if (
+            !buffer ||
+            buffer.length ===
+              0
+          ) {
+            continue;
+          }
+
+          const sourcePdf =
+            await PDFDocument.load(
+              buffer,
+            );
+
+          const pages =
+            await mergedPdf.copyPages(
+              sourcePdf,
+              sourcePdf.getPageIndices(),
+            );
+
+          pages.forEach(
+            (page) => {
+              mergedPdf.addPage(
+                page,
+              );
+            },
+          );
+
+          pdfCount++;
+        }
+
+
+        /*
+         * ==========================================
+         * 12. VALIDAR RESULTADO
+         * ==========================================
+         */
+
+        if (
+          pdfCount === 0 ||
+          mergedPdf.getPageCount() ===
+            0
+        ) {
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            "No se encontraron PDFs válidos para unir.",
+          );
+        }
+
+
+        /*
+         * ==========================================
+         * 13. CALCULAR MONTO
+         * ==========================================
+         */
+
+        const totalAmount =
+          filteredInvoices.reduce(
+            (total, invoice) =>
+              total +
+              (
+                typeof invoice.amount ===
+                "number"
+                  ? invoice.amount
+                  : 0
+              ),
+            0,
+          );
+
+
+        /*
+         * ==========================================
+         * 14. GENERAR PDF
+         * ==========================================
+         */
+
+        const mergedBuffer =
+          await mergedPdf.save();
+
+
+        /*
+         * ==========================================
+         * 15. CREAR REGISTRO ÚNICO
+         * ==========================================
+         */
+
+        const reportRef =
+          db
+            .collection("users")
+            .doc(userId)
+            .collection("reports")
+            .doc();
+
+        const reportId =
+          reportRef.id;
+
+
+        /*
+         * ==========================================
+         * 16. RUTA ÚNICA DEL PDF
+         * ==========================================
+         */
+
+        const reportPath =
+          `users/${userId}/reports/${startDate}-to-${endDate}/${reportId}.pdf`;
+
+        const reportFile =
+          bucket.file(
+            reportPath,
+          );
+
+
+        /*
+         * ==========================================
+         * 17. GUARDAR PDF
+         * ==========================================
+         */
+
+        await reportFile.save(
+          Buffer.from(
+            mergedBuffer,
+          ),
+          {
+            metadata: {
+              contentType:
+                "application/pdf",
+
+              metadata: {
+                userId,
+
+                reportId,
+
+                startDate,
+
+                endDate,
+
+                invoiceCount:
+                  String(
+                    pdfCount,
+                  ),
+
+                totalAmount:
+                  String(
+                    totalAmount,
+                  ),
+              },
+            },
+          },
+        );
+
+
+        /*
+         * ==========================================
+         * 18. GENERAR URL TEMPORAL
+         * ==========================================
+         */
+
+        const [
+          url,
+        ] =
+          await reportFile.getSignedUrl(
+            {
+              action:
+                "read",
+
+              expires:
+                Date.now() +
+                1000 *
+                  60 *
+                  60,
+            },
+          );
+
+
+        /*
+         * ==========================================
+         * 19. GUARDAR HISTORIAL EN FIRESTORE
+         * ==========================================
+         */
+
+        await reportRef.set({
+
+          id:
+            reportId,
+
+          userId,
+
+          startDate,
+
+          endDate,
+
+          invoiceCount:
+            pdfCount,
+
+          totalAmount,
+
+          pageCount:
+            mergedPdf.getPageCount(),
+
+          storagePath:
+            reportPath,
+
+          generatedAt:
+            admin.firestore
+              .FieldValue
+              .serverTimestamp(),
+
+        });
+
+
+        /*
+         * ==========================================
+         * 20. RESPUESTA
+         * ==========================================
+         */
+
+        return {
+
+          success:
+            true,
+
+          reportId,
+
+          startDate,
+
+          endDate,
+
+          invoiceCount:
+            pdfCount,
+
+          totalAmount,
+
+          pageCount:
+            mergedPdf.getPageCount(),
+
+          storagePath:
+            reportPath,
+
+          url,
+        };
+      },
+
+      
+    );
+
 /**
  * ==========================================
  * RECIBIR FACTURA DESDE CORREO

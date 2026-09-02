@@ -34,6 +34,8 @@ type Report = {
   id: string;
   year?: number | null;
   month?: number | null;
+  startDate?: string | null;
+  endDate?: string | null;
   invoiceCount?: number | null;
   totalAmount?: number | null;
   pageCount?: number | null;
@@ -149,6 +151,24 @@ export default function ReportesPage() {
         now.getMonth() + 1,
       ).padStart(2, "0")}`;
     });
+
+  /*
+   * ==========================================
+   * RANGO DE FECHAS (NUEVA FUNCIONALIDAD)
+   * ==========================================
+   */
+
+  const [rangeStartDate, setRangeStartDate] =
+    useState("");
+
+  const [rangeEndDate, setRangeEndDate] =
+    useState("");
+
+  const [rangeMode, setRangeMode] =
+    useState(false);
+
+  const [viajesToday, setViajesToday] =
+    useState<Invoice[]>([]);
 
   /*
    * ==========================================
@@ -363,6 +383,38 @@ export default function ReportesPage() {
 
   const selectedInvoices =
     useMemo(() => {
+      if (rangeMode) {
+        /*
+         * Modo rango: filtrar por tripDate
+         */
+
+        if (
+          !rangeStartDate ||
+          !rangeEndDate
+        ) {
+          return [];
+        }
+
+        return invoices.filter(
+          (invoice) => {
+            if (!invoice.tripDate) {
+              return false;
+            }
+
+            return (
+              invoice.tripDate >=
+                rangeStartDate &&
+              invoice.tripDate <=
+                rangeEndDate
+            );
+          },
+        );
+      }
+
+      /*
+       * Modo mes: filtrar por uploadedAt
+       */
+
       return invoices.filter(
         (invoice) => {
           if (!invoice.uploadedAt) {
@@ -382,6 +434,9 @@ export default function ReportesPage() {
     }, [
       invoices,
       selectedMonth,
+      rangeMode,
+      rangeStartDate,
+      rangeEndDate,
     ]);
 
   /*
@@ -510,17 +565,6 @@ export default function ReportesPage() {
         return;
       }
 
-      const [
-        yearString,
-        monthString,
-      ] = selectedMonth.split("-");
-
-      const year =
-        Number(yearString);
-
-      const month =
-        Number(monthString);
-
       setGenerating(true);
       setError(null);
 
@@ -528,50 +572,125 @@ export default function ReportesPage() {
         const functions =
           getFunctions(auth.app);
 
-        const generateMonthlyReport =
-          httpsCallable<
-            {
-              year: number;
-              month: number;
-            },
-            MonthlyReportResponse
-          >(
-            functions,
-            "generateMonthlyReport",
+        if (rangeMode) {
+          /*
+           * ==========================================
+           * MODO RANGO
+           * ==========================================
+           */
+
+          const generateRangeReport =
+            httpsCallable<
+              {
+                startDate: string;
+                endDate: string;
+              },
+              {
+                success: boolean;
+                startDate: string;
+                endDate: string;
+                invoiceCount: number;
+                pageCount: number;
+                storagePath: string;
+                url: string;
+              }
+            >(
+              functions,
+              "generateRangeReport",
+            );
+
+          const result =
+            await generateRangeReport({
+              startDate:
+                rangeStartDate,
+              endDate:
+                rangeEndDate,
+            });
+
+          const data =
+            result.data;
+
+          if (
+            !data.success ||
+            !data.url
+          ) {
+            throw new Error(
+              "No se pudo generar el expediente.",
+            );
+          }
+
+          window.open(
+            data.url,
+            "_blank",
+            "noopener,noreferrer",
+          );
+        } else {
+          /*
+           * ==========================================
+           * MODO MES
+           * ==========================================
+           */
+
+          const [
+            yearString,
+            monthString,
+          ] = selectedMonth.split(
+            "-",
           );
 
-        const result =
-          await generateMonthlyReport({
-            year,
-            month,
-          });
+          const year =
+            Number(yearString);
 
-        const data =
-          result.data;
+          const month =
+            Number(monthString);
 
-        if (
-          !data.success ||
-          !data.url
-        ) {
-          throw new Error(
-            "No se pudo generar el expediente.",
+          const generateMonthlyReport =
+            httpsCallable<
+              {
+                year: number;
+                month: number;
+              },
+              {
+                success: boolean;
+                year: number;
+                month: number;
+                invoiceCount: number;
+                pageCount: number;
+                storagePath: string;
+                url: string;
+              }
+            >(
+              functions,
+              "generateMonthlyReport",
+            );
+
+          const result =
+            await generateMonthlyReport({
+              year,
+              month,
+            });
+
+          const data =
+            result.data;
+
+          if (
+            !data.success ||
+            !data.url
+          ) {
+            throw new Error(
+              "No se pudo generar el expediente.",
+            );
+          }
+
+          window.open(
+            data.url,
+            "_blank",
+            "noopener,noreferrer",
           );
         }
 
         /*
-         * Abrimos el PDF generado.
-         */
-
-        window.open(
-          data.url,
-          "_blank",
-          "noopener,noreferrer",
-        );
-
-        /*
-         * Volvemos a consultar reports para
-         * que el nuevo expediente aparezca
-         * inmediatamente en el historial.
+         * Recargar reportes
          */
 
         const user =
@@ -628,9 +747,12 @@ export default function ReportesPage() {
           err,
         );
 
-        setError(
-          "No pudimos generar el expediente mensual.",
-        );
+        const errorMsg =
+          err instanceof Error
+            ? err.message
+            : "No pudimos generar el expediente.";
+
+        setError(errorMsg);
       } finally {
         setGenerating(false);
       }
@@ -780,42 +902,79 @@ export default function ReportesPage() {
                 </h1>
 
                 <p className="mt-2 text-[#77736c]">
-                  Analizá tus viáticos y prepará tu expediente mensual.
+                  Analizá tus viáticos y prepará tu expediente.
                 </p>
 
               </div>
 
-              <select
-                value={selectedMonth}
-                onChange={(event) =>
-                  setSelectedMonth(
-                    event.target.value,
-                  )
-                }
-                className="rounded-xl border border-[#e4e0d9] bg-white px-4 py-3 text-sm font-medium outline-none"
+              {!rangeMode && (
+                <select
+                  value={selectedMonth}
+                  onChange={(event) =>
+                    setSelectedMonth(
+                      event.target.value,
+                    )
+                  }
+                  className="rounded-xl border border-[#e4e0d9] bg-white px-4 py-3 text-sm font-medium outline-none"
+                >
+
+                  {monthlyData
+                    .slice()
+                    .reverse()
+                    .map(
+                      (month) => (
+                        <option
+                          key={
+                            month.key
+                          }
+                          value={
+                            month.key
+                          }
+                        >
+                          {
+                            month.label
+                          }
+                        </option>
+                      ),
+                    )}
+
+                </select>
+              )}
+
+            </div>
+
+            {/* Toggle Modo */}
+            <div className="mt-6 flex gap-2">
+
+              <button
+                type="button"
+                onClick={() => {
+                  setRangeMode(false);
+                  setRangeStartDate("");
+                  setRangeEndDate("");
+                }}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                  !rangeMode
+                    ? "bg-[#1d1d1f] text-white"
+                    : "border border-[#e4e0d9] bg-white text-[#55514a] hover:bg-[#f6f3ee]"
+                }`}
               >
+                Por mes
+              </button>
 
-                {monthlyData
-                  .slice()
-                  .reverse()
-                  .map(
-                    (month) => (
-                      <option
-                        key={
-                          month.key
-                        }
-                        value={
-                          month.key
-                        }
-                      >
-                        {
-                          month.label
-                        }
-                      </option>
-                    ),
-                  )}
-
-              </select>
+              <button
+                type="button"
+                onClick={() => {
+                  setRangeMode(true);
+                }}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                  rangeMode
+                    ? "bg-[#1d1d1f] text-white"
+                    : "border border-[#e4e0d9] bg-white text-[#55514a] hover:bg-[#f6f3ee]"
+                }`}
+              >
+                Por rango
+              </button>
 
             </div>
 
@@ -824,6 +983,71 @@ export default function ReportesPage() {
           {error && (
             <div className="mt-6 rounded-2xl bg-[#fff4f2] p-4 text-sm text-[#9a5b50]">
               {error}
+            </div>
+          )}
+
+          {/* Selector de Rango (Modo Rango) */}
+          {rangeMode && (
+            <div className="mt-6 rounded-[28px] border border-[#eeeae4] bg-white p-6">
+
+              <h2 className="text-lg font-semibold">
+                Seleccionar rango de fechas
+              </h2>
+
+              <p className="mt-1 text-sm text-[#8a857c]">
+                El expediente incluirá los viajes realizados dentro de este rango.
+              </p>
+
+              <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-6">
+
+                <div className="flex-1">
+
+                  <label
+                    htmlFor="range-start"
+                    className="mb-2 block text-xs font-medium text-[#8a857c]"
+                  >
+                    Desde
+                  </label>
+
+                  <input
+                    id="range-start"
+                    type="date"
+                    value={rangeStartDate}
+                    onChange={(e) =>
+                      setRangeStartDate(
+                        e.target.value,
+                      )
+                    }
+                    className="w-full rounded-xl border border-[#e4e0d9] bg-white px-4 py-3 text-sm text-[#55514a] outline-none transition focus:border-[#c8b99f]"
+                  />
+
+                </div>
+
+                <div className="flex-1">
+
+                  <label
+                    htmlFor="range-end"
+                    className="mb-2 block text-xs font-medium text-[#8a857c]"
+                  >
+                    Hasta
+                  </label>
+
+                  <input
+                    id="range-end"
+                    type="date"
+                    value={rangeEndDate}
+                    onChange={(e) =>
+                      setRangeEndDate(
+                        e.target.value,
+                      )
+                    }
+                    className="w-full rounded-xl border border-[#e4e0d9] bg-white px-4 py-3 text-sm text-[#55514a] outline-none transition focus:border-[#c8b99f]"
+                  />
+
+                </div>
+
+              </div>
+
             </div>
           )}
 
@@ -839,75 +1063,134 @@ export default function ReportesPage() {
             <>
 
               {/* =====================================
-                  RESUMEN
+                  RESUMEN (MODO MES)
                   ===================================== */}
 
-              <section className="mt-10 grid gap-4 sm:grid-cols-3">
+              {!rangeMode && (
+                <section className="mt-10 grid gap-4 sm:grid-cols-3">
 
-                <div className="rounded-[24px] border border-[#eeeae4] bg-white p-6">
+                  <div className="rounded-[24px] border border-[#eeeae4] bg-white p-6">
 
-                  <p className="text-sm text-[#8a857c]">
-                    Viáticos del mes
-                  </p>
+                    <p className="text-sm text-[#8a857c]">
+                      Viáticos del mes
+                    </p>
 
-                  <p className="mt-3 text-3xl font-semibold">
-                    ₡
-                    {selectedTotal.toLocaleString(
-                      "es-CR",
-                    )}
-                  </p>
+                    <p className="mt-3 text-3xl font-semibold">
+                      ₡
+                      {selectedTotal.toLocaleString(
+                        "es-CR",
+                      )}
+                    </p>
 
-                </div>
+                  </div>
 
-                <div className="rounded-[24px] border border-[#eeeae4] bg-white p-6">
+                  <div className="rounded-[24px] border border-[#eeeae4] bg-white p-6">
 
-                  <p className="text-sm text-[#8a857c]">
-                    Facturas
-                  </p>
+                    <p className="text-sm text-[#8a857c]">
+                      Facturas
+                    </p>
 
-                  <p className="mt-3 text-3xl font-semibold">
-                    {
-                      selectedInvoices.length
-                    }
-                  </p>
+                    <p className="mt-3 text-3xl font-semibold">
+                      {
+                        selectedInvoices.length
+                      }
+                    </p>
 
-                  <p className="mt-1 text-xs text-[#aaa49a]">
-                    Del período seleccionado
-                  </p>
+                    <p className="mt-1 text-xs text-[#aaa49a]">
+                      Del período seleccionado
+                    </p>
 
-                </div>
+                  </div>
 
-                <div className="rounded-[24px] bg-[#1d1d1f] p-6 text-white">
+                  <div className="rounded-[24px] bg-[#1d1d1f] p-6 text-white">
 
-                  <p className="text-sm text-white/60">
-                    Expediente mensual
-                  </p>
+                    <p className="text-sm text-white/60">
+                      Expediente mensual
+                    </p>
 
-                  <button
-                    onClick={
-                      handleGenerateReport
-                    }
-                    disabled={
-                      generating ||
-                      selectedInvoices.length ===
-                        0
-                    }
-                    className="mt-4 w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:bg-[#f1eee9] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {generating
-                      ? "Generando PDF..."
-                      : "Generar expediente PDF"}
-                  </button>
+                    <button
+                      onClick={
+                        handleGenerateReport
+                      }
+                      disabled={
+                        generating ||
+                        selectedInvoices.length ===
+                          0
+                      }
+                      className="mt-4 w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:bg-[#f1eee9] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {generating
+                        ? "Generando PDF..."
+                        : "Generar expediente PDF"}
+                    </button>
 
-                </div>
+                  </div>
 
-              </section>
+                </section>
+              )}
 
               {/* =====================================
-                  GRÁFICA
+                  RESUMEN (MODO RANGO)
                   ===================================== */}
 
-              <section className="mt-6 rounded-[28px] border border-[#eeeae4] bg-white p-6 sm:p-8">
+              {rangeMode && (
+                <section className="mt-10 rounded-[28px] bg-[#1d1d1f] p-6 text-white">
+
+                  <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+
+                    <div>
+
+                      <p className="text-sm text-white/60">
+                        Viajes encontrados
+                      </p>
+
+                      <p className="mt-2 text-3xl font-semibold">
+                        {
+                          selectedInvoices.length
+                        }
+                      </p>
+
+                      {selectedInvoices.length >
+                        0 && (
+                        <p className="mt-2 text-sm text-white/80">
+                          Total: ₡
+                          {selectedTotal.toLocaleString(
+                            "es-CR",
+                          )}
+                        </p>
+                      )}
+
+                    </div>
+
+                    <button
+                      onClick={
+                        handleGenerateReport
+                      }
+                      disabled={
+                        generating ||
+                        selectedInvoices.length ===
+                          0 ||
+                        !rangeStartDate ||
+                        !rangeEndDate
+                      }
+                      className="w-full rounded-xl bg-white px-6 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:bg-[#f1eee9] disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+                    >
+                      {generating
+                        ? "Generando PDF..."
+                        : "Generar expediente PDF"}
+                    </button>
+
+                  </div>
+
+                </section>
+              )}
+
+              {/* =====================================
+                  GRÁFICA (SOLO MODO MES)
+                  ===================================== */}
+
+              {!rangeMode && (
+                <section className="mt-6 rounded-[28px] border border-[#eeeae4] bg-white p-6 sm:p-8">
 
                 <h2 className="text-lg font-semibold">
                   Viáticos por mes
@@ -979,12 +1262,32 @@ export default function ReportesPage() {
                 </div>
 
               </section>
+              )}
 
               {/* =====================================
-                  FACTURAS DEL PERÍODO
+                  MOSTRAR ESTADO RANGO
                   ===================================== */}
 
-              <section className="mt-6">
+              {rangeMode && selectedInvoices.length === 0 && rangeStartDate && rangeEndDate && (
+                <section className="mt-6 rounded-[24px] border border-[#eeeae4] bg-white p-10 text-center">
+
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#f6f1e9] text-2xl">
+                    📄
+                  </div>
+
+                  <h3 className="mt-4 font-semibold">
+                    No hay viajes realizados en este rango
+                  </h3>
+
+                  <p className="mt-2 text-sm text-[#77736c]">
+                    Selecciona un rango diferente para encontrar viajes.
+                  </p>
+
+                </section>
+              )}
+
+              {!rangeMode && (
+                <section className="mt-6">
 
                 <h2 className="text-lg font-semibold">
                   Facturas del período
@@ -1089,6 +1392,7 @@ export default function ReportesPage() {
                 )}
 
               </section>
+              )}
 
               {/* =====================================
                   HISTORIAL DE EXPEDIENTES
@@ -1183,17 +1487,18 @@ export default function ReportesPage() {
                                 <div className="min-w-0">
 
                                   <h3 className="font-semibold">
-                                    Expediente{" "}
-                                    {report.year ??
-                                      "—"}
-                                    -
-                                    {String(
-                                      report.month ??
-                                        0,
-                                    ).padStart(
-                                      2,
-                                      "0",
-                                    )}
+                                    {report.year &&
+                                    report.month
+                                      ? `Expediente ${report.year}-${String(
+                                          report.month,
+                                        ).padStart(
+                                          2,
+                                          "0",
+                                        )}`
+                                      : report.startDate &&
+                                          report.endDate
+                                        ? `Expediente ${report.startDate} a ${report.endDate}`
+                                        : "Expediente"}
                                   </h3>
 
                                   <p className="mt-1 text-sm text-[#77736c]">
