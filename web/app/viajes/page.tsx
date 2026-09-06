@@ -40,6 +40,12 @@ type Invoice = {
   status?: string | null;
 };
 
+type Report = {
+  invoiceIds?: string[] | null;
+  startDate?: string | null;
+  endDate?: string | null;
+};
+
 function formatUploadedAt(
   value?: Timestamp | null,
 ) {
@@ -84,6 +90,8 @@ function normalizeProvider(
 
 export default function ViajesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoiceReportRanges, setInvoiceReportRanges] =
+    useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [openingInvoice, setOpeningInvoice] =
     useState<string | null>(null);
@@ -107,6 +115,7 @@ export default function ViajesPage() {
       async (user) => {
         if (!user) {
           setInvoices([]);
+          setInvoiceReportRanges({});
           setLoading(false);
           return;
         }
@@ -143,6 +152,48 @@ export default function ViajesPage() {
           });
 
           setInvoices(loadedInvoices);
+
+          const reportsRef = collection(
+            db,
+            "users",
+            user.uid,
+            "reports",
+          );
+
+          const reportsSnapshot = await getDocs(
+            reportsRef,
+          );
+
+          const rangesByInvoice: Record<
+            string,
+            string
+          > = {};
+
+          reportsSnapshot.docs.forEach(
+            (reportDoc) => {
+              const report =
+                reportDoc.data() as Report;
+
+              if (
+                !report.invoiceIds ||
+                !report.startDate ||
+                !report.endDate
+              ) {
+                return;
+              }
+
+              report.invoiceIds.forEach(
+                (invoiceId) => {
+                  rangesByInvoice[invoiceId] =
+                    `${report.startDate} a ${report.endDate}`;
+                },
+              );
+            },
+          );
+
+          setInvoiceReportRanges(
+            rangesByInvoice,
+          );
         } catch (error) {
           console.error(
             "ERROR CARGANDO FACTURAS:",
@@ -450,17 +501,6 @@ export default function ViajesPage() {
             invoices.length > 0 && (
               <section className="mt-10">
 
-                <div className="mb-5 flex items-center gap-3 rounded-2xl border border-[#eeeae4] bg-[#f6f3ee] px-4 py-3 text-sm text-[#77736c]">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[#a18d6d]">
-                    i
-                  </span>
-
-                  <p>
-                    La asociación de facturas con expedientes todavía no está disponible en los datos de esta pantalla.
-                  </p>
-
-                </div>
-
                 {/* Filtros */}
                 <div className="rounded-[24px] border border-[#eeeae4] bg-white p-5 shadow-[0_6px_24px_rgba(0,0,0,0.03)]">
 
@@ -694,6 +734,24 @@ export default function ViajesPage() {
                               </p>
                             </div>
 
+                          </div>
+
+                          <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-[#eeeae4] pt-4 text-xs">
+                            {invoiceReportRanges[invoice.id] ? (
+                              <span className="font-medium text-[#4f8a62]">
+                                🟢 Incluida en expediente
+                              </span>
+                            ) : (
+                              <span className="font-medium text-[#8a857c]">
+                                ⚪ No incluida en expediente
+                              </span>
+                            )}
+
+                            {invoiceReportRanges[invoice.id] && (
+                              <span className="text-[#77736c]">
+                                Rango: {invoiceReportRanges[invoice.id]}
+                              </span>
+                            )}
                           </div>
 
                           {/* Acciones */}

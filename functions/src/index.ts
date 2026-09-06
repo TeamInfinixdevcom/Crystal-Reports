@@ -1130,6 +1130,8 @@ export const generateMonthlyReport =
 
         let pdfCount = 0;
 
+        const includedInvoiceIds: string[] = [];
+
 
         /*
          * ==========================================
@@ -1194,6 +1196,10 @@ export const generateMonthlyReport =
                 page,
               );
             },
+          );
+
+          includedInvoiceIds.push(
+            invoice.id,
           );
 
           pdfCount++;
@@ -1368,6 +1374,9 @@ export const generateMonthlyReport =
 
           invoiceCount:
             pdfCount,
+
+          invoiceIds:
+            includedInvoiceIds,
 
           totalAmount,
 
@@ -1860,6 +1869,8 @@ export const generateRangeReport =
 
         let pdfCount = 0;
 
+        const includedInvoiceIds: string[] = [];
+
 
         /*
          * ==========================================
@@ -1924,6 +1935,10 @@ export const generateRangeReport =
                 page,
               );
             },
+          );
+
+          includedInvoiceIds.push(
+            invoice.id,
           );
 
           pdfCount++;
@@ -2091,6 +2106,9 @@ export const generateRangeReport =
 
           invoiceCount:
             pdfCount,
+
+          invoiceIds:
+            includedInvoiceIds,
 
           totalAmount,
 
