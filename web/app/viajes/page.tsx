@@ -246,13 +246,6 @@ export default function ViajesPage() {
       endIndex,
     );
 
-  useEffect(() => {
-    setCurrentPage(1);
-    }, [
-      providerFilter,
-      dateFilter,
-  ]);
-
   const clearFilters = () => {
     setProviderFilter("all");
     setDateFilter("");
@@ -457,6 +450,17 @@ export default function ViajesPage() {
             invoices.length > 0 && (
               <section className="mt-10">
 
+                <div className="mb-5 flex items-center gap-3 rounded-2xl border border-[#eeeae4] bg-[#f6f3ee] px-4 py-3 text-sm text-[#77736c]">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[#a18d6d]">
+                    i
+                  </span>
+
+                  <p>
+                    La asociación de facturas con expedientes todavía no está disponible en los datos de esta pantalla.
+                  </p>
+
+                </div>
+
                 {/* Filtros */}
                 <div className="rounded-[24px] border border-[#eeeae4] bg-white p-5 shadow-[0_6px_24px_rgba(0,0,0,0.03)]">
 
@@ -475,11 +479,12 @@ export default function ViajesPage() {
                         id="date-filter"
                         type="date"
                         value={dateFilter}
-                        onChange={(event) =>
+                        onChange={(event) => {
                           setDateFilter(
                             event.target.value,
-                          )
-                        }
+                          );
+                          setCurrentPage(1);
+                        }}
                         className="w-full rounded-xl border border-[#e4e0d9] bg-[#faf9f7] px-4 py-3 text-sm text-[#55514a] outline-none transition focus:border-[#c8b99f]"
                       />
                     </div>
@@ -498,11 +503,12 @@ export default function ViajesPage() {
                         value={
                           providerFilter
                         }
-                        onChange={(event) =>
+                        onChange={(event) => {
                           setProviderFilter(
                             event.target.value,
-                          )
-                        }
+                          );
+                          setCurrentPage(1);
+                        }}
                         className="w-full rounded-xl border border-[#e4e0d9] bg-[#faf9f7] px-4 py-3 text-sm text-[#55514a] outline-none transition focus:border-[#c8b99f]"
                       >
                         <option value="all">

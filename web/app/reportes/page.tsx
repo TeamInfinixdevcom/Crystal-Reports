@@ -43,16 +43,6 @@ type Report = {
   generatedAt?: Timestamp | null;
 };
 
-type MonthlyReportResponse = {
-  success: boolean;
-  year: number;
-  month: number;
-  invoiceCount: number;
-  pageCount: number;
-  storagePath: string;
-  url: string;
-};
-
 const MONTHS = [
   "Enero",
   "Febrero",
@@ -166,9 +156,6 @@ export default function ReportesPage() {
 
   const [rangeMode, setRangeMode] =
     useState(false);
-
-  const [viajesToday, setViajesToday] =
-    useState<Invoice[]>([]);
 
   /*
    * ==========================================
@@ -548,10 +535,6 @@ export default function ReportesPage() {
       startIndex,
       endIndex,
     );
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [reportDateFilter]);
 
   /*
    * ==========================================
@@ -986,9 +969,30 @@ export default function ReportesPage() {
             </div>
           )}
 
-          {/* Selector de Rango (Modo Rango) */}
-          {rangeMode && (
-            <div className="mt-6 rounded-[28px] border border-[#eeeae4] bg-white p-6">
+          {/* Preparación del expediente nuevo */}
+          <section className="mt-8 rounded-[28px] border border-[#e7dccb] bg-[#f8f1e7] p-6 shadow-[0_8px_30px_rgba(161,141,109,0.08)] sm:p-8">
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9a805d]">
+                  Nueva acción
+                </p>
+                <h2 className="mt-2 text-xl font-semibold">
+                  Generar nuevo expediente
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm text-[#756b5d]">
+                  Seleccioná un período para preparar un PDF con los viajes encontrados.
+                </p>
+              </div>
+
+              <span className="w-fit rounded-full border border-[#dfceb7] bg-[#fffaf4] px-3 py-1 text-xs font-medium text-[#8f7957]">
+                En preparación
+              </span>
+            </div>
+
+            {/* Selector de Rango (Modo Rango) */}
+            {rangeMode && (
+            <div className="mt-6 rounded-2xl border border-[#eadfd1] bg-[#fffaf4] p-5">
 
               <h2 className="text-lg font-semibold">
                 Seleccionar rango de fechas
@@ -1049,7 +1053,15 @@ export default function ReportesPage() {
               </div>
 
             </div>
-          )}
+            )}
+
+            {!rangeMode && (
+              <p className="mt-6 rounded-2xl border border-[#eadfd1] bg-[#fffaf4] px-4 py-3 text-sm text-[#756b5d]">
+                Período seleccionado: <span className="font-medium text-[#4f473d]">{selectedMonth}</span>
+              </p>
+            )}
+
+          </section>
 
           {loading ? (
             <section className="mt-10 flex min-h-[300px] items-center justify-center rounded-[28px] border border-[#eeeae4] bg-white">
@@ -1062,12 +1074,10 @@ export default function ReportesPage() {
           ) : (
             <>
 
-              {/* =====================================
-                  RESUMEN (MODO MES)
-                  ===================================== */}
+                {/* Resumen de la nueva generación */}
 
               {!rangeMode && (
-                <section className="mt-10 grid gap-4 sm:grid-cols-3">
+                <section className="mt-6 grid gap-4 sm:grid-cols-3">
 
                   <div className="rounded-[24px] border border-[#eeeae4] bg-white p-6">
 
@@ -1134,7 +1144,7 @@ export default function ReportesPage() {
                   ===================================== */}
 
               {rangeMode && (
-                <section className="mt-10 rounded-[28px] bg-[#1d1d1f] p-6 text-white">
+                <section className="mt-6 rounded-[28px] bg-[#1d1d1f] p-6 text-white">
 
                   <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
 
@@ -1398,19 +1408,22 @@ export default function ReportesPage() {
                   HISTORIAL DE EXPEDIENTES
                   ===================================== */}
 
-              <section className="mt-10">
+              <section className="mt-16 border-t-2 border-[#d9d0c4] pt-10">
 
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
 
                   <div>
 
-                    <h2 className="text-lg font-semibold">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#a18d6d]">
+                      Expedientes ya generados
+                    </p>
+
+                    <h2 className="mt-2 text-2xl font-semibold">
                       Historial de expedientes
                     </h2>
 
-                    <p className="mt-1 text-sm text-[#8a857c]">
-                      Cada PDF generado queda guardado
-                      independientemente.
+                    <p className="mt-2 max-w-xl text-sm text-[#77736c]">
+                      Consultá aquí los expedientes PDF generados anteriormente. Esta lista es independiente de los viajes del período que estás preparando.
                     </p>
 
                   </div>
@@ -1434,9 +1447,12 @@ export default function ReportesPage() {
                       onChange={(
                         event,
                       ) =>
-                        setReportDateFilter(
-                          event.target.value,
-                        )
+                        {
+                          setReportDateFilter(
+                            event.target.value,
+                          );
+                          setCurrentPage(1);
+                        }
                       }
                       className="rounded-xl border border-[#e4e0d9] bg-white px-4 py-3 text-sm text-[#55514a] outline-none transition focus:border-[#c8b99f]"
                     />
