@@ -44,6 +44,8 @@ type Report = {
   invoiceIds?: string[] | null;
   startDate?: string | null;
   endDate?: string | null;
+  year?: number | null;
+  month?: number | null;
 };
 
 function formatUploadedAt(
@@ -101,7 +103,10 @@ export default function ViajesPage() {
   const [providerFilter, setProviderFilter] =
     useState("all");
 
-  const [dateFilter, setDateFilter] =
+  const [dateFrom, setDateFrom] =
+    useState("");
+
+  const [dateTo, setDateTo] =
     useState("");
 
   const [currentPage, setCurrentPage] =
@@ -174,18 +179,23 @@ export default function ViajesPage() {
               const report =
                 reportDoc.data() as Report;
 
-              if (
-                !report.invoiceIds ||
-                !report.startDate ||
-                !report.endDate
-              ) {
+              if (!report.invoiceIds) {
                 return;
               }
+
+              const reportLabel =
+                report.startDate && report.endDate
+                  ? `${report.startDate} a ${report.endDate}`
+                  : report.year && report.month
+                    ? `Expediente mensual ${String(
+                        report.month,
+                      ).padStart(2, "0")}/${report.year}`
+                    : "Expediente generado";
 
               report.invoiceIds.forEach(
                 (invoiceId) => {
                   rangesByInvoice[invoiceId] =
-                    `${report.startDate} a ${report.endDate}`;
+                    reportLabel;
                 },
               );
             },
@@ -235,22 +245,19 @@ export default function ViajesPage() {
        * Si no existe, usamos tripDate.
        */
 
-      if (dateFilter) {
-        const invoiceDate =
-          invoice.invoiceDate ??
-          invoice.tripDate;
-
-        if (!invoiceDate) {
+      if (dateFrom || dateTo) {
+        if (!invoice.tripDate) {
           return false;
         }
 
-        const normalizedInvoiceDate =
-          invoiceDate.slice(0, 10);
+        const normalizedTripDate =
+          invoice.tripDate.slice(0, 10);
 
-        if (
-          normalizedInvoiceDate !==
-          dateFilter
-        ) {
+        if (dateFrom && normalizedTripDate < dateFrom) {
+          return false;
+        }
+
+        if (dateTo && normalizedTripDate > dateTo) {
           return false;
         }
       }
@@ -260,8 +267,12 @@ export default function ViajesPage() {
   }, [
     invoices,
     providerFilter,
-    dateFilter,
+    dateFrom,
+    dateTo,
   ]);
+
+  const invalidDateRange =
+    Boolean(dateFrom && dateTo && dateFrom > dateTo);
 
   /*
    * ==========================================
@@ -299,7 +310,8 @@ export default function ViajesPage() {
 
   const clearFilters = () => {
     setProviderFilter("all");
-    setDateFilter("");
+    setDateFrom("");
+    setDateTo("");
     setCurrentPage(1);
   };
 
@@ -509,18 +521,41 @@ export default function ViajesPage() {
                     {/* Fecha */}
                     <div className="flex-1">
                       <label
-                        htmlFor="date-filter"
+                        htmlFor="date-from-filter"
                         className="mb-2 block text-xs font-medium text-[#8a857c]"
                       >
-                        Fecha
+                        Desde
                       </label>
 
                       <input
-                        id="date-filter"
+                        id="date-from-filter"
                         type="date"
-                        value={dateFilter}
+                        value={dateFrom}
                         onChange={(event) => {
-                          setDateFilter(
+                          setDateFrom(
+                            event.target.value,
+                          );
+                          setCurrentPage(1);
+                        }}
+                        className="w-full rounded-xl border border-[#e4e0d9] bg-[#faf9f7] px-4 py-3 text-sm text-[#55514a] outline-none transition focus:border-[#c8b99f]"
+                      />
+                    </div>
+
+                    {/* Hasta */}
+                    <div className="flex-1">
+                      <label
+                        htmlFor="date-to-filter"
+                        className="mb-2 block text-xs font-medium text-[#8a857c]"
+                      >
+                        Hasta
+                      </label>
+
+                      <input
+                        id="date-to-filter"
+                        type="date"
+                        value={dateTo}
+                        onChange={(event) => {
+                          setDateTo(
                             event.target.value,
                           );
                           setCurrentPage(1);
@@ -570,7 +605,8 @@ export default function ViajesPage() {
                     </div>
 
                     {/* Limpiar */}
-                    {(dateFilter ||
+                    {(dateFrom ||
+                      dateTo ||
                       providerFilter !==
                         "all") && (
                       <button
@@ -596,7 +632,8 @@ export default function ViajesPage() {
                         : `${startIndex + 1}–${endIndex} de ${filteredInvoices.length} facturas`}
                     </p>
 
-                    {(dateFilter ||
+                    {(dateFrom ||
+                      dateTo ||
                       providerFilter !==
                         "all") && (
                       <p className="text-xs text-[#aaa49a]">
@@ -605,6 +642,12 @@ export default function ViajesPage() {
                     )}
 
                   </div>
+
+                  {invalidDateRange && (
+                    <p className="mt-3 text-xs font-medium text-[#b35f54]">
+                      La fecha desde no puede ser posterior a la fecha hasta.
+                    </p>
+                  )}
 
                 </div>
 
