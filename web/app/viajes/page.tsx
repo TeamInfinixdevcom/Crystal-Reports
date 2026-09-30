@@ -147,13 +147,20 @@ export default function ViajesPage() {
             }));
 
           loadedInvoices.sort((a, b) => {
-            const dateA =
+            const dateA = a.tripDate ?? "";
+            const dateB = b.tripDate ?? "";
+
+            if (dateA !== dateB) {
+              return dateB.localeCompare(dateA);
+            }
+
+            const uploadedAtA =
               a.uploadedAt?.toMillis() ?? 0;
 
-            const dateB =
+            const uploadedAtB =
               b.uploadedAt?.toMillis() ?? 0;
 
-            return dateB - dateA;
+            return uploadedAtB - uploadedAtA;
           });
 
           setInvoices(loadedInvoices);
