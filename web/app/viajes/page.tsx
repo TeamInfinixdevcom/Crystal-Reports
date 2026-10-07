@@ -14,6 +14,10 @@ import {
   getDownloadURL,
   ref,
 } from "firebase/storage";
+import {
+  getFunctions,
+  httpsCallable,
+} from "firebase/functions";
 
 import {
   auth,
@@ -38,6 +42,8 @@ type Invoice = {
   currency?: string | null;
   invoiceNumber?: string | null;
   status?: string | null;
+  processingError?: string | null;
+  travelId?: string | null;
 };
 
 type Report = {
@@ -99,6 +105,8 @@ export default function ViajesPage() {
     useState<string | null>(null);
   const [deletingInvoice, setDeletingInvoice] =
     useState<string | null>(null);
+  const [processingInvoiceId, setProcessingInvoiceId] =
+    useState<string | null>(null);
 
   const [providerFilter, setProviderFilter] =
     useState("all");
@@ -147,20 +155,20 @@ export default function ViajesPage() {
             }));
 
           loadedInvoices.sort((a, b) => {
-            const dateA = a.tripDate ?? "";
-            const dateB = b.tripDate ?? "";
-
-            if (dateA !== dateB) {
-              return dateB.localeCompare(dateA);
-            }
-
             const uploadedAtA =
               a.uploadedAt?.toMillis() ?? 0;
 
             const uploadedAtB =
               b.uploadedAt?.toMillis() ?? 0;
 
-            return uploadedAtB - uploadedAtA;
+            if (uploadedAtA !== uploadedAtB) {
+              return uploadedAtB - uploadedAtA;
+            }
+
+            const dateA = a.tripDate ?? "";
+            const dateB = b.tripDate ?? "";
+
+            return dateB.localeCompare(dateA);
           });
 
           setInvoices(loadedInvoices);
@@ -416,6 +424,83 @@ export default function ViajesPage() {
       );
     } finally {
       setDeletingInvoice(null);
+    }
+  };
+
+  const handleRetryInvoice = async (
+    invoice: Invoice,
+  ) => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      alert("Tu sesión ha expirado.");
+      return;
+    }
+
+    try {
+      setProcessingInvoiceId(invoice.id);
+
+      const processInvoice = httpsCallable<
+        {
+          travelId: string | null;
+          invoiceId: string;
+        },
+        {
+          success: boolean;
+          invoiceId: string;
+          status: string;
+          data: {
+            provider: string | null;
+            category: string | null;
+            invoiceDate: string | null;
+            tripDate: string | null;
+            amount: number | null;
+          };
+        }
+      >(
+        getFunctions(auth.app),
+        "processInvoice",
+      );
+
+      const result = await processInvoice({
+        travelId: invoice.travelId ?? null,
+        invoiceId: invoice.id,
+      });
+
+      if (!result.data.success) {
+        throw new Error(
+          "La factura no pudo ser procesada.",
+        );
+      }
+
+      setInvoices((currentInvoices) =>
+        currentInvoices.map((currentInvoice) =>
+          currentInvoice.id === invoice.id
+            ? {
+                ...currentInvoice,
+                provider: result.data.data.provider,
+                category: result.data.data.category,
+                invoiceDate:
+                  result.data.data.invoiceDate,
+                tripDate: result.data.data.tripDate,
+                amount: result.data.data.amount,
+                status: result.data.status,
+                processingError: null,
+              }
+            : currentInvoice,
+        ),
+      );
+    } catch (error) {
+      console.error(
+        "ERROR REPROCESANDO FACTURA:",
+        error,
+      );
+
+      alert(
+        "El servicio todavía no pudo procesar la factura. Intentá nuevamente más tarde.",
+      );
+    } finally {
+      setProcessingInvoiceId(null);
     }
   };
 
@@ -710,11 +795,19 @@ export default function ViajesPage() {
                             </div>
 
                             <span className="w-fit rounded-full bg-[#f6f1e9] px-3 py-1 text-xs font-medium text-[#8f7957]">
-                              {invoice.status ??
-                                "uploaded"}
+                              {invoice.processingError
+                                ? "No procesada"
+                                : invoice.status ??
+                                  "uploaded"}
                             </span>
 
                           </div>
+
+                          {invoice.processingError && (
+                            <p className="mt-4 rounded-xl bg-[#fff4f2] px-4 py-3 text-xs font-medium text-[#9a5b50]">
+                              No pudimos identificar los datos de esta factura. Podés volver a procesarla cuando el servicio esté disponible.
+                            </p>
+                          )}
 
                           <div className="mt-6 grid grid-cols-2 gap-4 border-t border-[#eeeae4] pt-5 sm:grid-cols-5">
 
@@ -806,6 +899,31 @@ export default function ViajesPage() {
 
                           {/* Acciones */}
                           <div className="mt-5 flex justify-end gap-2">
+
+                            {invoice.processingError && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleRetryInvoice(
+                                    invoice,
+                                  )
+                                }
+                                disabled={
+                                  processingInvoiceId ===
+                                    invoice.id ||
+                                  deletingInvoice ===
+                                    invoice.id ||
+                                  openingInvoice ===
+                                    invoice.id
+                                }
+                                className="rounded-xl bg-[#1d1d1f] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#333] disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {processingInvoiceId ===
+                                invoice.id
+                                  ? "Procesando..."
+                                  : "Reintentar procesamiento"}
+                              </button>
+                            )}
 
                             <button
                               type="button"

@@ -31,6 +31,7 @@ type Report = {
 export default function Summary() {
   const [travelCount, setTravelCount] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
+  const [pendingAmountCount, setPendingAmountCount] = useState(0);
   const [documentCount, setDocumentCount] = useState(0);
   const [expedientCount, setExpedientCount] = useState(0);
   const [monthlyAllowance, setMonthlyAllowance] = useState(0);
@@ -42,6 +43,7 @@ export default function Summary() {
         if (!user) {
           setTravelCount(0);
           setTotalAmount(0);
+          setPendingAmountCount(0);
           setDocumentCount(0);
           setExpedientCount(0);
           setMonthlyAllowance(0);
@@ -159,6 +161,12 @@ export default function Summary() {
               0,
             );
 
+          const pendingAmountCountValue =
+            monthlyInvoices.filter(
+              (invoice) =>
+                typeof invoice.amount !== "number",
+            ).length;
+
           /*
            * ==========================================
            * DOCUMENTOS
@@ -225,6 +233,10 @@ export default function Summary() {
           );
 
           setTotalAmount(amount);
+
+          setPendingAmountCount(
+            pendingAmountCountValue,
+          );
 
           setDocumentCount(
             documentCountValue,
@@ -302,9 +314,13 @@ export default function Summary() {
         )}`,
       description:
         monthlyAllowance > 0
-          ? `Gastado: ₡${totalAmount.toLocaleString(
-              "es-CR",
-            )}`
+          ? pendingAmountCount > 0
+            ? `Gastado confirmado: ₡${totalAmount.toLocaleString(
+                "es-CR",
+              )} · ${pendingAmountCount} pendiente(s)`
+            : `Gastado: ₡${totalAmount.toLocaleString(
+                "es-CR",
+              )}`
           : "Configurá tu viático en Mi perfil",
     },
     {
