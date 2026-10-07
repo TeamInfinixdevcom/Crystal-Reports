@@ -381,10 +381,25 @@ Respondé únicamente con JSON válido.
     );
   }
 
+  const jsonText =
+    responseText
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/, "")
+      .trim();
+
   const extractedData =
     JSON.parse(
-      responseText,
+      jsonText,
     ) as Partial<ExtractedInvoiceData>;
+
+  if (
+    !extractedData ||
+    typeof extractedData !== "object"
+  ) {
+    throw new Error(
+      "Gemini devolvió una respuesta inválida.",
+    );
+  }
 
   let amount:
     number | null = null;
@@ -2397,6 +2412,99 @@ export const receiveInvoiceEmail =
           ) {
             const duplicateInvoice =
               duplicateSnapshot.docs[0];
+
+            const duplicateData =
+              duplicateInvoice.data();
+
+            const duplicateIsComplete =
+              typeof duplicateData.amount ===
+                "number" &&
+              duplicateData.processedAt &&
+              duplicateData.processingError ==
+                null &&
+              (
+                duplicateData.status ===
+                  "review" ||
+                duplicateData.status ===
+                  "confirmed"
+              );
+
+            if (!duplicateIsComplete) {
+              invoiceRef =
+                duplicateInvoice.ref;
+
+              const extractedData =
+                await processInvoiceWithGemini(
+                  fileBuffer,
+                  mimeType,
+                );
+
+              await invoiceRef.update({
+                provider:
+                  extractedData.provider,
+
+                category:
+                  extractedData.category,
+
+                invoiceDate:
+                  extractedData.invoiceDate,
+
+                tripDate:
+                  extractedData.tripDate,
+
+                tripTime:
+                  extractedData.tripTime,
+
+                amount:
+                  extractedData.amount,
+
+                currency:
+                  extractedData.currency,
+
+                invoiceNumber:
+                  extractedData.invoiceNumber,
+
+                origin:
+                  extractedData.origin,
+
+                destination:
+                  extractedData.destination,
+
+                service:
+                  extractedData.service,
+
+                distance:
+                  extractedData.distance,
+
+                duration:
+                  extractedData.duration,
+
+                paymentMethod:
+                  extractedData.paymentMethod,
+
+                status:
+                  "review",
+
+                processingError:
+                  null,
+
+                processedAt:
+                  admin.firestore
+                    .FieldValue
+                    .serverTimestamp(),
+              });
+
+              res.status(200).json({
+                success: true,
+                reprocessed: true,
+                invoiceId:
+                  duplicateInvoice.id,
+                status: "review",
+                data: extractedData,
+              });
+
+              return;
+            }
 
             console.log(
               "FACTURA DUPLICADA DETECTADA:",
